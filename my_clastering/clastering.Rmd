@@ -1,0 +1,102 @@
+---
+title: "Clastering"
+author: "Michał Zakielarz"
+date: "24 05 2023"
+output: html_document
+---
+```{r,warning=FALSE,message=FALSE}
+library(readxl)
+dane <- read_excel("dane.xlsx")
+
+
+library(lmtest)
+library(cluster)
+library(fpc)
+library(MASS)
+
+```
+
+```{r}
+frame1<- data.frame(dane)
+k <- ncol(frame1)
+```
+
+```{r}
+frame2 <- data.frame(scale(frame1[,2:k]))
+```
+
+```{r}
+X <- data.frame(frame1[1],frame2)
+
+```
+
+```{r}
+dist.X <- dist(X[2:k],method = "euclidian")
+round(dist.X,2)
+```
+
+```{r}
+CW<-hclust(dist.X,method = "ward.D2",members = NULL)
+A1<-plot(CW,labels = X[,1],main="Dendogram obszarów")
+```
+
+```{r}
+clust<-cutree(CW,k=4)
+```
+
+```{r}
+show <- lapply(1:4,function(which.group)frame1[1][clust==which.group,])
+show
+```
+
+dla 5 klastrów
+```{r}
+clust2<-cutree(CW,k=5)
+show2 <- lapply(1:5,function(which.group)frame1[1][clust2==which.group,])
+show2
+
+```
+
+dla 4 klastrów wybrane dane do analizy
+```{r}
+S<-cluster.stats(dist.X,clust)
+S$cluster.size
+
+S$average.distance
+
+S$separation.matrix
+
+S$average.between
+
+S$average.within
+
+```
+
+Dla 5 klastrów te same dane:
+```{r}
+S2<-cluster.stats(dist.X,clust2)
+S2$cluster.size
+
+S2$average.distance
+
+S2$separation.matrix
+
+S2$average.between
+
+S2$average.within
+```
+
+wybór lepszego:
+
+```{r}
+ifelse(S$wb.ratio<=S2$wb.ratio,"I opcja lepsza","II lepsza")
+```
+```{r}
+ifelse(S$pearsongamma>=S2$pearsongamma,"I opcja lepsza","II lepsza")
+```
+```{r}
+ifelse(S$dunn2>=S2$dunn2,"I opcja lepsza","II lepsza")
+```
+
+
+Biorąc pod uwagę wszystkie powyższe wyniki, należy stwierdzić, że podział na 4 klastry jest najbardziej optymalny
