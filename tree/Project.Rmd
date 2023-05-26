@@ -1,0 +1,108 @@
+---
+title: "Drzewa klasyfikacyjne"
+author: "Kamil Kukiełka"
+date: "2023-05-22"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+---
+## Przygotowanie danych
+Na początek zaimportujmy naszą bazę danych oraz potrzebne bibilioteki
+```{r,warning=FALSE,message=FALSE}
+library(readxl)
+dane <- read_excel("data.xlsx")
+library(MASS)
+library(maptree)
+library(rpart)
+library(rpart.plot)
+library(party)
+library(class)
+```
+
+Tworzymy ramkę danych a następnie usuwamy braki danych
+```{r}
+raw_data <- data.frame(dane)
+data <- na.omit(data.frame(raw_data))
+head(data)
+```
+
+## Tworzenie zbioru uczącego oraz testowego
+
+Aby utworzyć nasze zbiry uczący bierzemy w sposób losowy rekordy z naszej ramki danych i przydzielamy je do naszych zbiorów
+```{r}
+indexes <- sample(1:nrow(dane),nrow(dane)/2,replace = FALSE)
+
+ZU = dane[indexes, ]
+ZT = dane[-indexes, ]
+
+head(ZU)
+head(ZT)
+```
+## Tworzymy model drzewa
+
+Tworzymy go za pomocą funkcji rpart, wykorzystyjąc zbiór uczący. Jak że nasze zmienne są jakościowe wybieramy metodę "class"
+```{r}
+drzewo <- rpart(ZU$`Approved Loan`~.,ZU,method = "class")
+```
+Dla naszego drzewa możemy sprawdzić jego parametry oraz liczbę gałęzi
+```{r}
+drzewo$parms
+drzewo$numresp
+```
+
+Jako że wygenerowane potrafią być bardzo rozległe możemy spróbować je przyciąć. W naszym przypadku liczba gałęzi jest dość mała, jednak i tak możemy sprawdzić czy przycięcie go nie sprawi że będzie lepsze
+```{r}
+model.opt<-which.min(drzewo$cptable[,4])
+cp.opt<-drzewo$cptable[model.opt,1]
+drzewo2<-prune(drzewo,cp=model.opt)
+```
+
+## Weryfikacja naszych modeli
+
+Teraz kiedy mamy już nasze modele możemy sprawdzić ich dopasowanie do zbioru uczącego dla naszego pierwotnego drzewa
+```{r, results='hold'}
+Pred1<-predict(drzewo,ZU,type = "class")
+
+print("tabela dobroci klasyfikacji")
+table(predykacja=Pred1,prawdziwe=ZU$`Approved Loan`)
+
+print("obliczanie błędu predykcji")
+blad1<-mean(Pred1 != ZU$`Approved Loan`)
+blad1
+```
+oraz dla przyciętego drzewa
+```{r, results='hold'}
+Pred2<-predict(drzewo2,ZU,type = "class")
+
+print("tabela dobroci klasyfikacji")
+table(predykacja=Pred2,prawdziwe=ZU$`Approved Loan`)
+
+print("obliczanie błędu predykcji")
+blad2<-mean(Pred2 != ZU$`Approved Loan`)
+blad2
+```
+Jak możemy zauważyć nasze przycięte drzewo daje wiekszy bład predykcji, jednak nie pozbywajmy się go jeszcze, gdyż może mieć znacznie mniejszy błąd predykcji na zbiorze testowym
+## Testowanie na zbiorze testowym
+```{r,results='hold'}
+TPred1<-predict(drzewo,ZT,type = "class")
+bladT1<-mean(TPred1 != ZT$`Approved Loan`)
+print("Błąd predykcji drzewa")
+bladT1
+
+TPred2<-predict(drzewo2,ZT,type = "class")
+bladT2<-mean(TPred2 != ZT$`Approved Loan`)
+print("Błąd predykcji drzewa Przyciętego")
+bladT2
+```
+Teraz możemy ocenić który z naszych modeli mamy wybrać. Nalezy jednak pamiętać, że podział na zbior uczący i testowy jest losowy więc po ponownym odpaleniu kodu możemy uzyskać inny rezultat
+
+## Rysowanie drzewa
+
+Kiedy zdecydujemy, który model jest lepszy możemy go narsyować, aby bardziej zwizualizować sobie jak działa dany model
+```{r}
+rpart.plot(drzewo,type = 4,extra="auto")
+rpart.plot(drzewo2,type = 4,extra="auto")
+```
+

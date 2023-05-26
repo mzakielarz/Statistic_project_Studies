@@ -1,0 +1,95 @@
+---
+title: "Tree"
+author: "Michał Zakielarz"
+date: "26 05 2023"
+output: html_document
+---
+Pakiety
+```{r,warning=FALSE,message=FALSE}
+library(readxl)
+dane <- read_excel("dane.xlsx")
+library(MASS)
+library(maptree)
+library(rpart)
+library(rpart.plot)
+library(party)
+library(class)
+```
+
+```{r}
+f_data <- data.frame(dane)
+data <- na.omit(data.frame(f_data))
+head(data)
+```
+
+Zbiór uczący
+```{r}
+indx <- sample(1:nrow(dane),nrow(dane)/2,replace = FALSE)
+zb_ucz = dane[indx, ]
+zb_test = dane[-indx, ] 
+
+head(zb_ucz)
+head(zb_test)
+```
+
+Model drzewa
+```{r}
+drzewo <- rpart(zb_ucz$`Posiadanie psa`~.,zb_ucz,method = "class")
+
+drzewo$parms
+drzewo$numresp
+```
+
+Ponieważ generowane drzewo może być bardzo rozległe, możemy rozważyć jego przycięcie. Pomimo że liczba gałęzi w naszym przypadku jest dość mała, warto sprawdzić, czy przycięcie drzewa nie poprawi jego jakości.
+
+```{r}
+optymalny_model<-which.min(drzewo$cptable[,4])
+optymalny_cp<-drzewo$cptable[optymalny_model,1]
+drzewo2<-prune(drzewo,cp=optymalny_model)
+
+```
+
+Weryfikacja
+```{r, results='hold'}
+przewid1<-predict(drzewo,zb_ucz,type = "class")
+
+print("tabela dobroci klasyfikacji")
+table(predykacja=przewid1,prawdziwe=zb_ucz$`Posiadanie psa`)
+
+print("obliczanie błędu predykcji")
+blad1<-mean(przewid1 != zb_ucz$`Posiadanie psa`)
+blad1
+```
+
+dla przyciętego drzewa:
+```{r, results='hold'}
+przewid2<-predict(drzewo2,zb_ucz,type = "class")
+
+print("tabela dobroci klasyfikacji")
+table(predykacja=przewid2,prawdziwe=zb_ucz$`Posiadanie psa`)
+
+print("obliczanie błędu predykcji")
+blad2<-mean(przewid2 != zb_ucz$`Posiadanie psa`)
+blad2
+```
+
+Analizując wyniki, zauważamy, że przycięte drzewo ma większy błąd predykcji. Niemniej jednak, zanim zdecydujemy się na jego usunięcie, warto sprawdzić, czy na zbiorze testowym drzewo to nie osiągnie znacznie mniejszego błędu predykcji. Dlatego zalecamy zachować przycięte drzewo i przeprowadzić dalsze testy na zbiorze testowym, aby ocenić jego skuteczność.
+
+```{r,results='hold'}
+Tprzewid1<-predict(drzewo,zb_test,type = "class")
+bladT1<-mean(Tprzewid1 != zb_ucz$`Posiadanie psa`)
+print("Błąd predykcji drzewa")
+bladT1
+
+Tprzewid2<-predict(drzewo2,zb_test,type = "class")
+bladT2<-mean(Tprzewid2 != zb_test$`Posiadanie psa`)
+print("Błąd predykcji drzewa Przyciętego")
+bladT2
+```
+
+Rysowanie:
+```{r, results='hold'}
+rpart.plot(drzewo,type = 4,extra="auto")
+rpart.plot(drzewo2,type = 4,extra="auto")
+```
+
