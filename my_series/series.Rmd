@@ -1,0 +1,91 @@
+---
+title: "Series"
+author: "Michał Zakielarz"
+date: "24 05 2023"
+output: html_document
+---
+
+
+```{r, results='hide',warning=FALSE,message=FALSE}
+library(readxl)
+dane<-read_excel("dane.xlsx",col_types = c("text", "numeric"))
+head(dane)
+library(forecast)
+library(tseries)
+library(fBasics)
+library(timeSeries)
+library(lmtest)
+library(TTR)
+```
+
+```{r}
+table <- data.frame(dane)
+X <- ts(table[2], start = c(1991,7),frequency = 12)
+plot.ts(X)
+```
+
+```{r}
+stac <-adf.test(X,alternative = "stationary",k = 2)
+ifelse(stac$p.value<0.05,"Szereg jest stacjonarny","Szereg jest niestacjonarny")
+
+explo <-adf.test(X,alternative = "explosive",k = 2)
+ifelse(explo$p.value<0.05,"Szereg jest eksplozywny","Szereg jest nieeksplozywny")
+
+```
+
+Trend
+```{r}
+trend <- kpss.test(X,null="Trend",lshort = TRUE)
+ifelse(trend$p.value<0.05,"Szereg ma trend","Szereg nie ma trendu")
+```
+Skoro jest stacjonarny to przeprowadźmy analizę
+```{r}
+basic<-basicStats(X,ci=0.95)
+basic
+```
+
+Dekompozycja
+```{r}
+plot(X)
+```
+
+```{r}
+decomp <- decompose(X,type="additive",filter = NULL)
+```
+
+Sezonowość
+```{r}
+plot(decomp$seasonal)
+```
+
+Trend szeregu
+```{r}
+plot(decomp$trend)
+```
+Odchylenie
+```{r}
+plot(decomp$random)
+```
+
+W naszym szeregu czasowym obserwujemy widoczną sezonalność, trend oraz wachania losowe. Ze względu na ten charakter naszego szeregu, metoda Holta-Wintersa jest odpowiednia do zastosowania. Na podstawie wcześniejszych wniosków możemy stwierdzić, że w tej metodzie powinniśmy użyć parametrów alfa, beta i gamma.
+
+```{r}
+X2 <- HoltWinters(X,seasonal = "additive")
+plot(X2)
+```
+
+Przewidywanie
+```{r}
+future <- forecast(X2,h=12)
+plot(future)
+```
+
+Test acf i Ljung-Box dla sprawdzenia autokorelacji
+```{r}
+acf(na.omit(future$residuals), lag.max=20)
+
+box_test<-Box.test(future$residuals, lag=20, type="Ljung-Box")
+ifelse(box_test$p.value<0.05,"Istotna autokorelacja w błędzie","zerowa autokorelacja w błędzie")
+```
+
+Podsumowując, na podstawie przeprowadzonego wyżej testu nie występuje autokorelacja. W związku z powyższym model prognozy jest poprawny
